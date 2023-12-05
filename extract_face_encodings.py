@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 from glob import glob
 
-import cv2
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import base64
@@ -11,17 +10,7 @@ import base64
 image_files = glob('images/*')
 
 def find_biggest_bounding_box(bounding_boxes):
-    """
-    Given a list of bounding boxes, return the coordinates of the biggest bounding box.
-
-    Parameters:
-    - bounding_boxes (list): List of bounding boxes in the format (top, right, bottom, left).
-
-    Returns:
-    - biggest_box (tuple): Coordinates of the biggest bounding box in the format (top, right, bottom, left).
-    """
     return max(bounding_boxes, key=lambda box: (box[2] - box[0]) * (box[1] - box[3]), default=None)
-
 
 def extract_face_encodings(image_file):
     try:
