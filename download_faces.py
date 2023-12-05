@@ -190,17 +190,17 @@ def upload_to_s3(path, bucket_name, client) -> str:
 def download_images_s3_parallel(df, client, image_folder, bucket_name, collection_name, max_workers=12) -> None:
 
     download = lambda url: download_image(url, image_file_path=os.path.join(image_folder, get_image_name(url)))
-    upload = lambda path: client.upload_file(path, bucket_name, path.split('/')[-1])
-    add_to_collection = lambda path: add_single_face_to_collection(client, bucket_name, path, collection_name)
+    #upload = lambda path: client.upload_file(path, bucket_name, path.split('/')[-1])
+    #add_to_collection = lambda path: add_single_face_to_collection(client, bucket_name, path, collection_name)
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         images = list(
             tqdm(
                 executor.map(
                     lambda url: pipe(url,
-                                     download,
-                                     upload,
-                                     add_to_collection),
+                                     download),
+                                     #upload,
+                                     #add_to_collection),
                     df['docUrl'],
                 ),
             total=len(df)
@@ -211,7 +211,7 @@ def download_images_s3_parallel(df, client, image_folder, bucket_name, collectio
 
 if __name__=='__main__':
 
-    urls = pd.read_csv('FILE_NAME')
+    urls = pd.read_csv('face_reco_urls.csv').sample(10_000)
     image_folder = ''
 
     s3_client = boto3.client(
@@ -220,7 +220,7 @@ if __name__=='__main__':
         aws_secret_access_key='', 
         region_name='us-east-2'
     )
-    rekognition_client = initialize_rekognition('us-east-2')
-    collection_response = initialize_empty_collection(rekognition_client, 'face_uniqueness_all_images')
+    #rekognition_client = initialize_rekognition('us-east-2')
+    #collection_response = initialize_empty_collection(rekognition_client, 'face_uniqueness_all_images')
 
-    download_images_s3_parallel(urls, image_folder, s3_client, image_folder, 'baubab-dev')
+    download_images_s3_parallel(urls, s3_client, image_folder, image_folder, 'baubab-dev')
