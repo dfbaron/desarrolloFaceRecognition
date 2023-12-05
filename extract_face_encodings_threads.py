@@ -1,70 +1,48 @@
-import  face_recognition as fr
-import numpy as np
-import pandas as pd
-from glob import glob
-from concurrent.futures import ThreadPoolExecutor
-
+import concurrent.futures
 from tqdm import tqdm
-import matplotlib.pyplot as plt
+from glob import glob
+import  face_recognition as fr
+import pandas as pd
 import base64
-from toolz.functoolz import pipe
-
-image_files = glob('images/*')
+import multiprocessing
 
 def find_biggest_bounding_box(bounding_boxes):
-    """
-    Given a list of bounding boxes, return the coordinates of the biggest bounding box.
-
-    Parameters:
-    - bounding_boxes (list): List of bounding boxes in the format (top, right, bottom, left).
-
-    Returns:
-    - biggest_box (tuple): Coordinates of the biggest bounding box in the format (top, right, bottom, left).
-    """
     return max(bounding_boxes, key=lambda box: (box[2] - box[0]) * (box[1] - box[3]), default=None)
 
-
 def extract_face_encodings(image_file):
-    #try:
+    try:
         image = fr.load_image_file(image_file)
         face_locations = fr.face_locations(image, model="hog")
         bigger_face = find_biggest_bounding_box(face_locations)
         face_encodings = fr.face_encodings(image, [bigger_face])
         return face_encodings[0]
-    #except:
-    #    print('Failed to process image')
-    #    return None
-    
+    except:
+        print(f'Failed to process image: {image_file}')
+        return None
+
 def process_image(image_file):
     face_enc = extract_face_encodings(image_file)
     return [image_file, face_enc]
 
-def process_parallel():
-    face_encoding = lambda image: process_image(image)
-    max_workers = 2
-    image_dataset = []
+def save_results(image_dataset):
+    df_face_encs = pd.DataFrame(image_dataset, columns=['image_name', 'face_encoding'])
+    df_face_encs['blob_face_encoding'] = df_face_encs['face_encoding'].apply(lambda x: base64.b64encode(x.tobytes()).decode('utf-8') if x is not None else None)
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        results = list(
-            tqdm(
-                executor.map(
-                    lambda image: pipe(image, face_encoding),
-                    image_files,
-                ),
-            total=len(image_files)
-            )
-        )
+    df_face_encs_processed = df_face_encs[~pd.isna(df_face_encs['face_encoding'])]
+    df_face_encs_processed[['image_name', 'blob_face_encoding']].to_csv('dataset/face_encodings_processed.csv', index=False)
 
-    print('Joining results')
-    image_dataset.extend(results)
-    return image_dataset
+    df_face_encs_non_processed = df_face_encs[pd.isna(df_face_encs['face_encoding'])]
+    df_face_encs_non_processed[['image_name', 'blob_face_encoding']].to_csv('dataset/face_encodings_non_processed.csv', index=False)
 
-image_dataset = process_parallel()
-df_face_encs = pd.DataFrame(image_dataset, columns=['image_name', 'face_encoding'])
-df_face_encs['blob_face_encoding'] = df_face_encs['face_encoding'].apply(lambda x: base64.b64encode(x.tobytes()).decode('utf-8') if x is not None else None)
+if __name__ == '__main__':
 
-df_face_encs_processed = df_face_encs[~pd.isna(df_face_encs['face_encoding'])]
-df_face_encs_processed[['image_name', 'blob_face_encoding']].to_csv('dataset/face_encodings_processed.csv', index=False)
+    multiprocessing.set_start_method('spawn', force=True)
+    image_files = glob('images/*')
 
-df_face_encs_non_processed = df_face_encs[pd.isna(df_face_encs['face_encoding'])]
-df_face_encs_non_processed[['image_name', 'blob_face_encoding']].to_csv('dataset/face_encodings_non_processed.csv', index=False)
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        results = list(tqdm(executor.map(process_image, image_files), total=len(image_files)))
+
+    image_dataset = [result for result in results if result[1] is not None]
+
+    print('Saving results')
+    save_results(image_dataset)
