@@ -1,2 +1,5 @@
-*.ipynb
 *.json
+*.jpg
+*.jpeg
+*.png
+*.csv

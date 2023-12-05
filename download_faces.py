@@ -211,8 +211,10 @@ def download_images_s3_parallel(df, client, image_folder, bucket_name, collectio
 
 if __name__=='__main__':
 
-    urls = pd.read_csv('face_reco_urls.csv').sample(10_000)
-    image_folder = ''
+    filename = 'dataset/face_reco_urls.csv'
+    urls = pd.read_csv(filename)
+    selfies_urls = urls[urls['docType']=='selfie'].sample(1000)
+    image_folder = 'images'
 
     s3_client = boto3.client(
         's3',
@@ -223,4 +225,4 @@ if __name__=='__main__':
     #rekognition_client = initialize_rekognition('us-east-2')
     #collection_response = initialize_empty_collection(rekognition_client, 'face_uniqueness_all_images')
 
-    download_images_s3_parallel(urls, s3_client, image_folder, image_folder, 'baubab-dev')
+    download_images_s3_parallel(selfies_urls, s3_client, image_folder, image_folder, 'baubab-dev')
